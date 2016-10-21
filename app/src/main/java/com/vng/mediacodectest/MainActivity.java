@@ -44,6 +44,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback,
         openCamera(1280, 720);
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        releaseCamera();
+    }
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
