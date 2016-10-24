@@ -55,6 +55,7 @@ public class Texture2dProgram {
 
     // Simple fragment shader for use with external 2D textures (e.g. what we get from
     // SurfaceTexture).
+
     private static final String FRAGMENT_SHADER_EXT =
             "#extension GL_OES_EGL_image_external : require\n" +
             "precision mediump float;\n" +
@@ -113,6 +114,78 @@ public class Texture2dProgram {
             "    gl_FragColor = sum;\n" +
             "}\n";
 
+    private static final String FRAGMENT_SHADER_EXT_BLUR =
+            "#extension GL_OES_EGL_image_external : require\n" +
+                    "precision mediump float;\n" +
+                    "varying vec2 vTextureCoord;\n" +
+                    "uniform samplerExternalOES sTexture;\n" +
+                    "vec2 singleStepOffset = vec2(0.0015625, 0.0027778);\n" +
+                    "mediump float params = 1.0;\n" +
+                    "const highp vec3 W = vec3(0.299,0.587,0.114);\n" +
+                    "vec2 blurCoordinates[20];\n" +
+                    "float hardLight(float color)\n" +
+                    "{\n" +
+                    "	if(color <= 0.5)\n" +
+                    "		color = color * color * 2.0;\n" +
+                    "	else\n" +
+                    "		color = 1.0 - ((1.0 - color)*(1.0 - color) * 2.0);\n" +
+                    "	return color;\n" +
+                    "}\n" +
+                    "void main(){\n" +
+                    "    vec3 centralColor = texture2D(sTexture, vTextureCoord).rgb;\n" +
+                    "    blurCoordinates[0] = vTextureCoord.xy + singleStepOffset * vec2(0.0, -10.0);\n" +
+                    "    blurCoordinates[1] = vTextureCoord.xy + singleStepOffset * vec2(0.0, 10.0);\n" +
+                    "    blurCoordinates[2] = vTextureCoord.xy + singleStepOffset * vec2(-10.0, 0.0);\n" +
+                    "    blurCoordinates[3] = vTextureCoord.xy + singleStepOffset * vec2(10.0, 0.0);\n" +
+                    "    blurCoordinates[4] = vTextureCoord.xy + singleStepOffset * vec2(5.0, -8.0);\n" +
+                    "    blurCoordinates[5] = vTextureCoord.xy + singleStepOffset * vec2(5.0, 8.0);\n" +
+                    "    blurCoordinates[6] = vTextureCoord.xy + singleStepOffset * vec2(-5.0, 8.0);\n" +
+                    "    blurCoordinates[7] = vTextureCoord.xy + singleStepOffset * vec2(-5.0, -8.0);\n" +
+                    "    blurCoordinates[8] = vTextureCoord.xy + singleStepOffset * vec2(8.0, -5.0);\n" +
+                    "    blurCoordinates[9] = vTextureCoord.xy + singleStepOffset * vec2(8.0, 5.0);\n" +
+                    "    blurCoordinates[10] = vTextureCoord.xy + singleStepOffset * vec2(-8.0, 5.0);\n" +
+                    "    blurCoordinates[11] = vTextureCoord.xy + singleStepOffset * vec2(-8.0, -5.0);\n" +
+                    "    blurCoordinates[12] = vTextureCoord.xy + singleStepOffset * vec2(0.0, -6.0);\n" +
+                    "    blurCoordinates[13] = vTextureCoord.xy + singleStepOffset * vec2(0.0, 6.0);\n" +
+                    "    blurCoordinates[14] = vTextureCoord.xy + singleStepOffset * vec2(6.0, 0.0);\n" +
+                    "    blurCoordinates[15] = vTextureCoord.xy + singleStepOffset * vec2(-6.0, 0.0);\n" +
+                    "    blurCoordinates[16] = vTextureCoord.xy + singleStepOffset * vec2(-4.0, -4.0);\n" +
+                    "    blurCoordinates[17] = vTextureCoord.xy + singleStepOffset * vec2(-4.0, 4.0);\n" +
+                    "    blurCoordinates[18] = vTextureCoord.xy + singleStepOffset * vec2(4.0, -4.0);\n" +
+                    "    blurCoordinates[19] = vTextureCoord.xy + singleStepOffset * vec2(4.0, 4.0);\n" +
+                    "    float sampleColor = centralColor.g * 20.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[0]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[1]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[2]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[3]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[4]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[5]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[6]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[7]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[8]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[9]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[10]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[11]).g;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[12]).g * 2.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[13]).g * 2.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[14]).g * 2.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[15]).g * 2.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[16]).g * 2.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[17]).g * 2.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[18]).g * 2.0;\n" +
+                    "    sampleColor += texture2D(sTexture, blurCoordinates[19]).g * 2.0;\n" +
+                    "    sampleColor = sampleColor / 48.0;\n" +
+                    "    float highPass = centralColor.g - sampleColor + 0.5;\n" +
+                    "    for(int i = 0; i < 5; i++)\n" +
+                    "    {\n" +
+                    "        highPass = hardLight(highPass);\n" +
+                    "    }\n" +
+                    "    float luminance = dot(centralColor, W);\n" +
+                    "    float alpha = pow(luminance, params);\n" +
+                    "    vec3 smoothColor = centralColor + (centralColor-vec3(highPass))*alpha*0.1;\n" +
+                    "    gl_FragColor = vec4(mix(smoothColor.rgb, max(smoothColor, centralColor), alpha), 1.0);\n" +
+                    "}\n";
+
     private ProgramType mProgramType;
 
     // Handles to the GL program and various components of it.
@@ -145,7 +218,7 @@ public class Texture2dProgram {
                 break;
             case TEXTURE_EXT:
                 mTextureTarget = GLES11Ext.GL_TEXTURE_EXTERNAL_OES;
-                mProgramHandle = GlUtil.createProgram(VERTEX_SHADER, FRAGMENT_SHADER_EXT);
+                mProgramHandle = GlUtil.createProgram(VERTEX_SHADER, FRAGMENT_SHADER_EXT_BLUR);
                 break;
             case TEXTURE_EXT_BW:
                 mTextureTarget = GLES11Ext.GL_TEXTURE_EXTERNAL_OES;

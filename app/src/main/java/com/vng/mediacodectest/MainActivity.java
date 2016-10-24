@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.hardware.Camera;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES20;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -19,6 +20,8 @@ import com.vng.mediacodectest.gles.Texture2dProgram;
 import com.vng.mediacodectest.gles.WindowSurface;
 
 import java.io.IOException;
+
+import static java.lang.Boolean.TRUE;
 
 /**
  * Created by ductn on 10/18/16.
@@ -37,7 +40,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback,
     private final float[] mTmpMatrix = new float[16];
     private Button mRecordButton;
     private boolean mIsRecording = false;
-
+    private RenderAsyncTask mRenderAsyncTask;
+    private EncodeAsyncTask mEncodeAsyncTask;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +92,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback,
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         // Initialize variables
+        mRenderAsyncTask = new RenderAsyncTask();
+        mEncodeAsyncTask = new EncodeAsyncTask();
+
         mEGLCore = new EglCore(null, EglCore.FLAG_RECORDABLE);
 
         mDisplaySurface = new WindowSurface(mEGLCore, holder.getSurface(), false);
@@ -126,41 +133,21 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback,
         long tStart = System.currentTimeMillis();
 
         // Update the texture from camera to GPU
-        mDisplaySurface.makeCurrent();
         mCameraTexture.updateTexImage();
         mCameraTexture.getTransformMatrix(mTmpMatrix);
 
-        // Render to screen
         SurfaceView sv = (SurfaceView) findViewById(R.id.surface_view);
         int viewWidth = sv.getWidth();
         int viewHeight = sv.getHeight();
-        GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-        GLES20.glViewport(0, 0, viewWidth, viewHeight);
-        mFullFrameBlit.drawFrame(mTextureID, mTmpMatrix);
-        mDisplaySurface.swapBuffers();
 
-        // TODO: move to another thread
-        if (mIsRecording) {
-            // Render to encoder's surface
-            mEncoderSurface.makeCurrent();
-            GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-            GLES20.glViewport(0, 0, 720, 1280);
-            mFullFrameBlit.drawFrame(mTextureID, mTmpMatrix);
-            mEncoder.drainEncoder(false);
-            mEncoderSurface.setPresentationTime(mCameraTexture.getTimestamp());
-            mEncoderSurface.swapBuffers();
-        }
-
-        long tElapsed = System.currentTimeMillis() - tStart;
-        Log.d("DEBUG:", "Process time is: " + tElapsed);
+        mRenderAsyncTask.doInBackground(viewWidth, viewHeight);
+        mEncodeAsyncTask.doInBackground(viewWidth, viewHeight);
     }
 
     /**
      * Try to choose front camera and open it
-     * @param width
-     * @param height
+     * @param width width of frames
+     * @param height height of frames
      */
     private void openCamera(int width, int height) {
         if (mCamera != null) {
@@ -198,6 +185,52 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback,
             mCamera.stopPreview();
             mCamera.release();
             mCamera = null;
+        }
+    }
+
+    private class RenderAsyncTask extends AsyncTask<Integer, Integer, Boolean> {
+        @Override
+        protected Boolean doInBackground(Integer... params) {
+            long tStart = System.currentTimeMillis();
+
+            // Render to screen
+            mDisplaySurface.makeCurrent();
+            GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+            GLES20.glViewport(0, 0, params[0], params[1]);
+            mFullFrameBlit.drawFrame(mTextureID, mTmpMatrix);
+            mDisplaySurface.swapBuffers();
+
+            long tElapsed = System.currentTimeMillis() - tStart;
+            Log.d("DEBUG", "Render time is: " + tElapsed);
+
+            return TRUE;
+        }
+    }
+
+    private class EncodeAsyncTask extends AsyncTask<Integer, Integer, Boolean> {
+
+        @Override
+        protected Boolean doInBackground(Integer... params) {
+            if (mIsRecording) {
+                long tStart = System.currentTimeMillis();
+
+                // Render to encoder's surface
+                mEncoderSurface.makeCurrent();
+                GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+                GLES20.glViewport(0, 0, 720, 1280);
+                mFullFrameBlit.drawFrame(mTextureID, mTmpMatrix);
+                mEncoder.drainEncoder(false);
+                mEncoderSurface.setPresentationTime(mCameraTexture.getTimestamp());
+                mEncoderSurface.swapBuffers();
+
+                long tElapsed = System.currentTimeMillis() - tStart;
+                Log.d("DEBUG", "Encode time is: " + tElapsed);
+
+            }
+
+            return TRUE;
         }
     }
 }
